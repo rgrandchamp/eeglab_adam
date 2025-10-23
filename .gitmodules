@@ -1,0 +1,3 @@
+[submodule "external/ADAM"]
+	path = external/ADAM
+	url = https://github.com/fahrenfort/ADAM
