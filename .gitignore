@@ -7,3 +7,4 @@ derivative
 !/plugins/firfilt
 !/plugins/ICLabel
 .DS_Store
+/external/*

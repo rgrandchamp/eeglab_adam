@@ -4,8 +4,23 @@ function s = adam_check_dependencies()
 
 s.ok = true; s.msgs = {};
 
-% Check ADAM functions
+% If key ADAM functions are missing, try one automatic setup pass
 need = {'adam_MVPA_firstlevel','adam_compute_group_MVPA','adam_compute_group_ERP','adam_plot_MVPA'};
+missing = false;
+for k = 1:numel(need)
+    if isempty(which(need{k})), missing = true; break; end
+end
+if missing
+    try
+        msgs = adam_setup_paths();
+        s.msgs = [s.msgs(:); msgs(:)];
+    catch ME
+        s.msgs{end+1} = sprintf('Path setup attempt failed: %s', ME.message);
+    end
+end
+
+% Re-check presence
+s.ok = true;
 for k = 1:numel(need)
     if isempty(which(need{k}))
         s.ok = false;
@@ -13,8 +28,7 @@ for k = 1:numel(need)
     end
 end
 
-% Optional: warn about FieldTrip versions (per ADAM notes)
-% (We do not enforce FT unless user requests TFR)
+% FieldTrip note (optional)
 if isempty(which('ft_defaults'))
     s.msgs{end+1} = 'FieldTrip not found (only required for TFR analyses).';
 end
