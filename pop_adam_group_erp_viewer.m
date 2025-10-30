@@ -47,13 +47,13 @@ addc({ 'style' 'pushbutton' 'string' 'Browse...' , 'callback', @onBrowseTarget }
 mpopts = {'none','cluster_based','bonferroni','fdr'};
 addc({ 'style' 'text' 'string' 'Multiple-comparison correction:' });
 addc({ 'style' 'popupmenu' 'tag' 'mp' 'string' strjoin(mpopts,'|') ...
-       'value' pickIndex(mpopts, def.mpcompcor_method, 2) });
+    'value' pickIndex(mpopts, def.mpcompcor_method, 2) });
 
 % Electrode method
 emopts = {'average','max','median'};
 addc({ 'style' 'text' 'string' 'Electrode method:' });
 addc({ 'style' 'popupmenu' 'tag' 'em' 'string' strjoin(emopts,'|') ...
-       'value' pickIndex(emopts, def.electrode_method, 1) });
+    'value' pickIndex(emopts, def.electrode_method, 1) });
 
 % Electrodes
 addc({ 'style' 'text' 'string' 'Electrodes (comma/space-separated):' });
@@ -130,9 +130,9 @@ end
 
 % ==================== Callbacks (nested) ====================
     function onBrowseTarget(src,~)
-        fig = ancestor(src,'figure');
+        fig   = ancestor(src,'figure');
         editH = findobj(fig,'tag','tgt');
-        p = uigetdir('','Select contrast folder or parent folder');
+        p = uigetdir_smart(fig, 'tgt', 'Select contrast folder or parent folder');
         if isequal(p,0), return; end
         set(editH,'string',p);
     end
@@ -151,8 +151,8 @@ end
 
         fig = ancestor(src,'figure');
         [idxL,ok] = listdlg('PromptString','Select electrodes', ...
-                            'SelectionMode','multiple', ...
-                            'ListString',labels,'ListSize',[240 320]);
+            'SelectionMode','multiple', ...
+            'ListString',labels,'ListSize',[240 320]);
         if ~ok, return; end
         set(findobj(fig,'tag','elec'),'string', strjoin(labels(idxL), ','));
     end
@@ -233,7 +233,7 @@ end
         if isempty(n) || ~isscalar(n), n = NaN; end
     end
 
-    % -------- Electrode sources with STUDY consistency check --------
+% -------- Electrode sources with STUDY consistency check --------
     function [labels, msg] = study_labels_if_consistent()
         labels = {}; msg = '';
         try
@@ -267,7 +267,7 @@ end
             idxs(end+1)    = ai; %#ok<AGROW>
         end
 
-        
+
         if length(unique(nbchans)) > 1
             msg = sprintf('Inconsistent channel counts across STUDY datasets');
             labels = {};
@@ -296,4 +296,18 @@ end
         catch
         end
     end
+end
+function p = uigetdir_smart(figHandle, editTag, titleStr)
+% UIGETDIR_SMART - Open a folder picker starting at the current value of an edit field.
+% If that path is invalid/empty, fall back to the current working directory (pwd).
+
+cur = '';
+h = findobj(figHandle,'tag',editTag);
+if ~isempty(h)
+    cur = strtrim(get(h,'string'));
+end
+if isempty(cur) || ~exist(cur,'dir')
+    cur = pwd;
+end
+p = uigetdir(cur, titleStr);
 end
