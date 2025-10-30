@@ -2,7 +2,9 @@ function pop_adam_firstlevel()
 % POP_ADAM_FIRSTLEVEL - GUI to run ADAM first-level MVPA from EEGLAB.
 % Author: <Your Name>, 2025 | License: GPLv3
 %
-% Adds an "Output folder" field to control cfg.outputdir.
+% Adds:
+%   - Output folder (cfg.outputdir)
+%   - Class 1 name and Class 2 name (cfg.class_labels{1,2})
 
 % ---- Defaults ----
 def.model        = 'BDM';
@@ -13,13 +15,17 @@ def.crossclass   = 'yes';
 def.channelpool  = 'ALL_NOSELECTION';
 def.resample     = 55;
 def.erp_baseline = [-0.1 0];
-def.outputdir    = ''; % leave empty so run fn can apply its own default if user doesn’t set it
+def.outputdir    = '';           % leave empty so runner can choose default
+def.classname1   = 'class1';     % default class labels if user leaves blank
+def.classname2   = 'class2';
 
 % ---- Geometry (rows) ----
 geometry = { ...
     [1] ...            % Title
-    [1 2] ...          % Class 1
-    [1 2] ...          % Class 2
+    [1 2] ...          % Class 1 spec
+    [1 2] ...          % Class 1 name
+    [1 2] ...          % Class 2 spec
+    [1 2] ...          % Class 2 name
     [1 2] ...          % Model
     [1 2] ...          % Data
     [1 2] ...          % Perf metric
@@ -29,19 +35,28 @@ geometry = { ...
     [1 1] ...          % resample
     [1 1] ...          % baseline
     [1 2 0.6] ...      % Output folder + edit + Browse
-    [1 1 1] ...        % buttons (Preset, Builder, Run)
+    % [1 1 1] ...        % buttons (Preset, Builder, Run)
     };
 
-% ---- Build UI list safely (one control per add) ----
+% ---- Build UI ----
 uilist = {};
 addc({ 'style' 'text' 'string' 'ADAM First-level (MVPA)' });
 
-addc({ 'style' 'text' 'string' 'Class 1 (e.g., cond_string([...]))' });
+% Class 1
+addc({ 'style' 'text' 'string' 'Class 1 spec (e.g., cond_string([...]))' });
 addc({ 'style' 'edit' 'tag' 'class1' 'string' '' });
 
-addc({ 'style' 'text' 'string' 'Class 2 (e.g., cond_string([...]))' });
+addc({ 'style' 'text' 'string' 'Class 1 name' });
+addc({ 'style' 'edit' 'tag' 'class1_name' 'string' def.classname1 });
+
+% Class 2
+addc({ 'style' 'text' 'string' 'Class 2 spec (e.g., cond_string([...]))' });
 addc({ 'style' 'edit' 'tag' 'class2' 'string' '' });
 
+addc({ 'style' 'text' 'string' 'Class 2 name' });
+addc({ 'style' 'edit' 'tag' 'class2_name' 'string' def.classname2 });
+
+% Other controls
 addc({ 'style' 'text' 'string' 'Model' });
 addc({ 'style' 'popupmenu' 'string' 'BDM|FEM' 'value' iff(strcmpi(def.model,'BDM'),1,2) });
 
@@ -66,7 +81,7 @@ addc({ 'style' 'edit' 'string' num2str(def.resample) });
 addc({ 'style' 'text' 'string' 'ERP baseline [start end] s' });
 addc({ 'style' 'edit' 'string' sprintf('%.3f %.3f', def.erp_baseline(1), def.erp_baseline(2)) });
 
-% ---- Output folder row ----
+% Output folder
 addc({ 'style' 'text' 'string' 'Output folder (cfg.outputdir):' });
 addc({ 'style' 'edit' 'tag' 'outputdir' 'string' def.outputdir });
 addc({ 'style' 'pushbutton' 'string' 'Browse...' 'callback' ...
@@ -74,24 +89,28 @@ addc({ 'style' 'pushbutton' 'string' 'Browse...' 'callback' ...
      'if isequal(p,0), return; end; ' ...
      'set(findobj(gcbf,''tag'',''outputdir''),''string'',p);'] });
 
-% ---- Buttons row
-addc({ 'style' 'pushbutton' 'string' 'Preset WH2015' 'callback' ...
-    ['set(findobj(gcbf,''tag'',''class1''),''string'',''cond_string([13 14 15],[5 13 17])'');' ...
-     'set(findobj(gcbf,''tag'',''class2''),''string'',''cond_string([17 18 19],[5 13 17])'');'] });
-addc({ 'style' 'pushbutton' 'string' 'Class builder...' 'callback' ...
-    ['[ok,cs1,cs2]=pop_adam_classbuilder();' ...
-     'if ok, set(findobj(gcbf,''tag'',''class1''),''string'',cs1);' ...
-     '        set(findobj(gcbf,''tag'',''class2''),''string'',cs2); end'] });
-addc({ 'style' 'pushbutton' 'string' 'Run' 'callback' 'uiresume(gcbf);' });
+% % Buttons
+% addc({ 'style' 'pushbutton' 'string' 'Preset WH2015' 'callback' ...
+%     ['set(findobj(gcbf,''tag'',''class1''),''string'',''cond_string([13 14 15],[5 13 17])'');' ...
+%      'set(findobj(gcbf,''tag'',''class1_name''),''string'',''NonFamous_First'');' ...
+%      'set(findobj(gcbf,''tag'',''class2''),''string'',''cond_string([17 18 19],[5 13 17])'');' ...
+%      'set(findobj(gcbf,''tag'',''class2_name''),''string'',''Scrambled_First'');'] });
+% addc({ 'style' 'pushbutton' 'string' 'Class builder...' 'callback' ...
+%     ['[ok,cs1,cs2]=pop_adam_classbuilder();' ...
+%      'if ok, set(findobj(gcbf,''tag'',''class1''),''string'',cs1);' ...
+%      '        set(findobj(gcbf,''tag'',''class2''),''string'',cs2); end'] });
+% addc({ 'style' 'pushbutton' 'string' 'Run' 'callback' 'uiresume(gcbf);' });
 
 % ---- Open GUI ----
 res = inputgui('geometry', geometry, 'uilist', uilist, 'title', 'ADAM First-level (MVPA)');
 if isempty(res), return; end
 
-% ---- Map results in order they were added (edits/popup values only) ----
+% ---- Map results in order ----
 idx = 0;
 class1        = nextstr();
+class1_name   = nextstr();
 class2        = nextstr();
+class2_name   = nextstr();
 model_i       = nextnum();
 raw_i         = nextnum();
 method_i      = nextnum();
@@ -100,10 +119,10 @@ channelpool_s = nextstr();
 nfolds_s      = nextstr();
 resample_s    = nextstr();
 baseline_s    = nextstr();
-outputdir_s   = nextstr(); % from Output folder edit
-% (browse & buttons return nothing)
+outputdir_s   = nextstr();
+% (buttons return nothing)
 
-% ---- Validate after dialog ----
+% ---- Validate ----
 if isempty(strtrim(class1)) || isempty(strtrim(class2))
     errordlg('Please fill both Class 1 and Class 2 event codes (comma-separated or cond_string(...)).','ADAM');
     return;
@@ -111,21 +130,18 @@ end
 
 % ---- Build cfg ----
 cfg = struct();
-cfg.class_spec   = { class1, class2 };
-cfg.model        = pick({'BDM','FEM'}, model_i, def.model);
-cfg.raw_or_tfr   = pick({'raw','tfr'}, raw_i, def.raw_or_tfr);
-cfg.class_method = pick({'AUC','accuracy','dprime'}, method_i, def.class_method);
-cfg.crossclass   = pick({'yes','no'}, cross_i, def.crossclass);
-cfg.channelpool  = fallback_str(channelpool_s, def.channelpool);
-cfg.nfolds       = safe_int(nfolds_s, def.nfolds);
-cfg.resample     = safe_int(resample_s, def.resample);
-cfg.erp_baseline = parse_baseline(baseline_s, def.erp_baseline);
-
-% Only set outputdir if user provided one; otherwise let the runner apply its default.
+cfg.class_spec    = { class1, class2 };
+cfg.class_labels  = { fallback_str(class1_name, def.classname1), fallback_str(class2_name, def.classname2) };
+cfg.model         = pick({'BDM','FEM'}, model_i, def.model);
+cfg.raw_or_tfr    = pick({'raw','tfr'}, raw_i, def.raw_or_tfr);
+cfg.class_method  = pick({'AUC','accuracy','dprime'}, method_i, def.class_method);
+cfg.crossclass    = pick({'yes','no'}, cross_i, def.crossclass);
+cfg.channelpool   = fallback_str(channelpool_s, def.channelpool);
+cfg.nfolds        = safe_int(nfolds_s, def.nfolds);
+cfg.resample      = safe_int(resample_s, def.resample);
+cfg.erp_baseline  = parse_baseline(baseline_s, def.erp_baseline);
 outputdir_s = strtrim(outputdir_s);
-if ~isempty(outputdir_s)
-    cfg.outputdir = outputdir_s;
-end
+if ~isempty(outputdir_s), cfg.outputdir = outputdir_s; end
 
 % ---- Run ----
 adam_run_firstlevel_from_eeglab(cfg);

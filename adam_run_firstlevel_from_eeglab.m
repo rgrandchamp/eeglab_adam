@@ -163,8 +163,36 @@ end
 
 % Output dir default (inside dataDir)
 if ~isfield(cfg,'outputdir') || isempty(cfg.outputdir)
-    cfg.outputdir = fullfile(cfg.datadir, 'RESULTS', 'EEG_RAW', 'EEGLAB_PLUGIN_RUN');
+    cfg.outputdir = fullfile(cfg.datadir, 'RESULTS', 'EEG_RAW');
 end
+% ----------------------------
+% Create pair subfolder: CLASS1LABEL_VS_CLASS2LABEL
+% ----------------------------
+% Accept both cfg.class_labels (cell) or legacy separate fields.
+label1 = 'class1'; label2 = 'class2';
+if isfield(cfg,'class_labels') && numel(cfg.class_labels) >= 2
+    label1 = cfg.class_labels{1};
+    label2 = cfg.class_labels{2};
+else
+    if isfield(cfg,'class_label1'), label1 = cfg.class_label1; end
+    if isfield(cfg,'class_label2'), label2 = cfg.class_label2; end
+end
+
+label1 = adam_safe_label(label1);
+label2 = adam_safe_label(label2);
+pairFolder = sprintf('%s_VS_%s', label1, label2);
+
+% Ensure base output dir exists
+if ~exist(cfg.outputdir,'dir'), mkdir(cfg.outputdir); end
+
+% Use subfolder for this contrast
+cfg.outputdir = fullfile(cfg.outputdir, pairFolder);
+if ~exist(cfg.outputdir,'dir')
+    mkdir(cfg.outputdir);
+end
+
+eegh(sprintf('[ADAM] Results subfolder: %s', cfg.outputdir));
+
 if ~exist(cfg.outputdir,'dir'), mkdir(cfg.outputdir); end
 
 % ----------------------------
@@ -272,4 +300,20 @@ try
     msgbox(sprintf('ADAM first-level finished.\nResults:\n%s', cfg.outputdir), 'ADAM');
 catch
 end
+end
+
+
+function s = adam_safe_label(s)
+% ADAM_SAFE_LABEL - Convert a label to a filesystem-safe token.
+% Replaces spaces and illegal filename chars by underscores and trims.
+    if ~(ischar(s) || isstring(s)), s = 'class'; return; end
+    s = char(string(s));
+    s = strtrim(s);
+    if isempty(s), s = 'class'; end
+    % Replace separators and illegal characters
+    s = regexprep(s, '[/\\:*?"<>|]', '_');
+    % Collapse whitespace to single underscore
+    s = regexprep(s, '\s+', '_');
+    % Guard against hidden names or dots-only
+    if all(s=='.') || all(s=='_'), s = 'class'; end
 end
