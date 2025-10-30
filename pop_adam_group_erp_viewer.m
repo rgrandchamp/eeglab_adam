@@ -1,179 +1,173 @@
 function pop_adam_group_erp_viewer()
-% POP_ADAM_GROUP_ERP_VIEWER - One-click viewer to plot group ERPs and their difference from ADAM first-level results.
+% POP_ADAM_GROUP_ERP_VIEWER - Plot group ERPs (and their difference) from ADAM first-level results.
+%
+% Behavior:
+%   - Select a folder in "Target folder":
+%       * If the folder name contains "_VS_" -> treat as a single contrast folder.
+%       * Otherwise -> scan immediate subfolders whose names contain "_VS_" and process them all.
+%   - For each contrast:
+%       erp_stats     = adam_compute_group_ERP(cfg_base, contrast_dir);
+%       erp_stats_dif = adam_compute_group_ERP(cfg_sub,  contrast_dir);
+%       adam_plot_MVPA(cfg_plot, erp_stats, erp_stats_dif);
+%
+% Electrode picker:
+%   - Tries STUDY + ALLEEG: verifies all datasets have the same nbchan, then uses
+%     labels from the FIRST dataset of the STUDY.
+%   - If STUDY is missing or inconsistent, falls back to EEG.chanlocs (if available).
 %
 % Author: <Your Name>, 2025 | License: GPLv3
 
 % ---------- Defaults ----------
-def.startdir          = getpref('eeglab_adam','resultsRoot','');
-def.mpcompcor_method  = 'cluster_based';
-def.electrode_method  = 'average';
-def.electrodes        = 'P10';
-def.line_colors_txt   = '[.75 .75 .75] | [.5 .5 .5] | [0 0 .5]'; % three series
-
-% Try to get labels for picker
-chanLabels = {};
-try
-    EEG = evalin('base','EEG');
-    if isstruct(EEG) && isfield(EEG,'chanlocs') && ~isempty(EEG.chanlocs)
-        chanLabels = {EEG.chanlocs.labels};
-        chanLabels = chanLabels(~cellfun(@isempty,chanLabels));
-    end
-catch
-end
+def.target_folder      = getpref('eeglab_adam','resultsRoot','');
+def.mpcompcor_method   = 'cluster_based';
+def.electrode_method   = 'average';
+def.electrodes_txt     = 'P10';
+def.line_colors_txt    = '[.75 .75 .75] | [.5 .5 .5] | [0 0 .5]';
+def.scan_recursive     = false;  % set true to scan recursively under parent folders
 
 % ---------- Geometry ----------
 geometry = { ...
     [1] ...                 % Title
-    [1 2 0.8] ...           % startdir + edit + Browse
-    [1 2 0.8] ...           % Contrast + popup + Refresh
+    [1 2 0.8] ...           % Target folder + edit + Browse
     [1 2] ...               % MP corr method
     [1 2] ...               % Electrode method
-    [1 2 0.8] ...           % Electrodes edit + Pick
+    [1 2 0.8] ...           % Electrodes + Pick
     [1 2] ...               % Line colors
-    % [1 1] ...               % Buttons (Plot, Close)
     };
 
 uilist = {};
-addc({ 'style' 'text' 'string' 'ADAM: Group ERP (select contrast & auto-plot)' });
+addc({ 'style' 'text'  'string' 'ADAM: Group ERP (single or multi-contrast from a chosen folder)' });
 
-% startdir row
-addc({ 'style' 'text'  'string' 'RESULTS root (cfg.startdir):' });
-addc({ 'style' 'edit'  'tag' 'startdir' 'string' def.startdir });
-addc({ 'style' 'pushbutton' 'string' 'Browse...' , 'callback', @onBrowseStartdir });
+% Target folder
+addc({ 'style' 'text'  'string' 'Target folder (contrast or parent):' });
+addc({ 'style' 'edit'  'tag' 'tgt' 'string' def.target_folder });
+addc({ 'style' 'pushbutton' 'string' 'Browse...' , 'callback', @onBrowseTarget });
 
-% contrast row
-addc({ 'style' 'text' 'string' 'Contrast folder (CLASS1_VS_CLASS2):' });
-addc({ 'style' 'popupmenu' 'tag' 'contrast_popup' 'string' '<refresh to scan...>' 'value' 1 });
-addc({ 'style' 'pushbutton' 'string' 'Refresh' , 'callback', @refreshContrasts });
-
-% mcc method
+% Multiple-comparison correction
 mpopts = {'none','cluster_based','bonferroni','fdr'};
 addc({ 'style' 'text' 'string' 'Multiple-comparison correction:' });
 addc({ 'style' 'popupmenu' 'tag' 'mp' 'string' strjoin(mpopts,'|') ...
        'value' pickIndex(mpopts, def.mpcompcor_method, 2) });
 
-% electrode method
+% Electrode method
 emopts = {'average','max','median'};
 addc({ 'style' 'text' 'string' 'Electrode method:' });
 addc({ 'style' 'popupmenu' 'tag' 'em' 'string' strjoin(emopts,'|') ...
        'value' pickIndex(emopts, def.electrode_method, 1) });
 
-% electrodes
+% Electrodes
 addc({ 'style' 'text' 'string' 'Electrodes (comma/space-separated):' });
-addc({ 'style' 'edit' 'tag' 'elec' 'string' def.electrodes });
-addc({ 'style' 'pushbutton' 'string' 'Pick…' , 'callback', @(src,~)onPickElectrodes(src,chanLabels) });
+addc({ 'style' 'edit' 'tag' 'elec' 'string' def.electrodes_txt });
+addc({ 'style' 'pushbutton' 'string' 'Pick…' , 'callback', @onPickElectrodes });
 
-% line colors
+% Line colors
 addc({ 'style' 'text' 'string' 'Line colors ([r g b] triplets, 3 entries):' });
 addc({ 'style' 'edit' 'tag' 'colors' 'string' def.line_colors_txt });
 
-% buttons
-% addc({ 'style' 'pushbutton' 'string' 'Plot ERPs' , 'callback', 'uiresume(gcbf);' });
-% addc({ 'style' 'pushbutton' 'string' 'Close'     , 'callback', 'close(gcbf);' });
-
 % ---------- Open dialog ----------
-res = inputgui('geometry', geometry, 'uilist', uilist, 'title', 'ADAM Group ERP Viewer');
+res = inputgui('geometry', geometry, 'uilist', uilist, 'title', 'ADAM Group ERP Viewer (single or multi-contrast)');
 if isempty(res), return; end
 
-% ---------- Map outputs in order (edits/popup only, in the same order we added them) ----------
+% ---------- Map outputs ----------
 idx = 0;
-startdir_s   = nextstr(res);   % startdir
-contrast_i   = nextnum(res);   % contrast popup value
-mp_i         = nextnum(res);   % mp popup value
-em_i         = nextnum(res);   % em popup value
-elecs_s      = nextstr(res);   % electrodes
-colors_s     = nextstr(res);   % colors
+target_folder = nextstr(res);
+mp_i          = nextnum(res);
+em_i          = nextnum(res);
+elecs_txt     = nextstr(res);
+colors_txt    = nextstr(res);
 
-% Validate startdir
-startdir_s = strtrim(startdir_s);
-if isempty(startdir_s) || ~exist(startdir_s,'dir')
-    errordlg('Please set a valid RESULTS root.','ADAM'); return;
+% ---------- Validate target ----------
+target_folder = strtrim(target_folder);
+if isempty(target_folder) || ~exist(target_folder,'dir')
+    errordlg('Please choose a valid target folder.','ADAM'); return;
 end
-setpref('eeglab_adam','resultsRoot', startdir_s);
+setpref('eeglab_adam','resultsRoot', target_folder);
 
-% Re-scan contrasts now and pick the one at contrast_i
-[names, paths] = scan_contrasts(startdir_s);
-if isempty(paths)
-    errordlg('No contrast folders (*_VS_*) found under RESULTS root.','ADAM'); return;
+% Decide single vs multi
+if is_contrast_folder(target_folder)
+    contrast_paths = {target_folder};
+else
+    contrast_paths = find_contrast_subfolders(target_folder, def.scan_recursive);
+    if isempty(contrast_paths)
+        errordlg('No contrast subfolders (*_VS_*) found in the selected folder.','ADAM'); return;
+    end
 end
-if ~isscalar(contrast_i) || contrast_i < 1 || contrast_i > numel(paths)
-    errordlg('Invalid contrast selection. Please try again.','ADAM'); return;
-end
-contrast_dir = paths{contrast_i};
 
-% ---------- Build cfgs ----------
+% ---------- Build base cfgs ----------
 cfg_base = [];
-cfg_base.startdir         = startdir_s;
+cfg_base.startdir         = startdir_for(target_folder);
 cfg_base.mpcompcor_method = pick(mpopts, mp_i, def.mpcompcor_method);
 cfg_base.electrode_method = pick(emopts,  em_i, def.electrode_method);
-cfg_base.electrode_def    = parse_electrodes(elecs_s);
+cfg_base.electrode_def    = parse_electrodes(elecs_txt);
 
 cfg_sub          = cfg_base;
 cfg_sub.condition_method = 'subtract';
 
-% Log
+% ---------- Parse line colors (optional) ----------
+cfgp = []; cfgp.singleplot = true;
 try
-    eegh('[ADAM] Group ERP viewer: contrast=%s | mp=%s | emeth=%s | elecs=%s', ...
-        contrast_dir, cfg_base.mpcompcor_method, cfg_base.electrode_method, strjoin(cfg_base.electrode_def,', '));
+    cfgp.line_colors = eval_linecolors(colors_txt);
 catch
+    % keep ADAM defaults
 end
 
-% ---------- Run ADAM (no selection dialog; pass contrast folder explicitly) ----------
-erp_stats     = adam_compute_group_ERP(cfg_base, contrast_dir); %#ok<NASGU>
-erp_stats_dif = adam_compute_group_ERP(cfg_sub,  contrast_dir); %#ok<NASGU>
+% ---------- Run for one or many contrasts ----------
+for k = 1:numel(contrast_paths)
+    cdir = contrast_paths{k};
+    cname = contrast_name(cdir);
+    try
+        eegh('[ADAM] Group ERP viewer: contrast=%s | mp=%s | emeth=%s | elecs=%s', ...
+            cdir, cfg_base.mpcompcor_method, cfg_base.electrode_method, strjoin(cfg_base.electrode_def,', '));
+    catch
+    end
 
-% ---------- Plot ----------
-cfgp = [];
-cfgp.singleplot = true;
-try
-    cfgp.line_colors = eval_linecolors(colors_s);
-catch
-    % leave default colors if parsing failed
+    erp_stats     = adam_compute_group_ERP(cfg_base, cdir); %#ok<NASGU>
+    erp_stats_dif = adam_compute_group_ERP(cfg_sub,  cdir); %#ok<NASGU>
+
+    adam_plot_MVPA(cfgp, erp_stats, erp_stats_dif);
+    try, set(gcf, 'Name', sprintf('ADAM Group ERP - %s', cname), 'NumberTitle', 'off'); end
 end
-adam_plot_MVPA(cfgp, erp_stats, erp_stats_dif);
 
 % ==================== Callbacks (nested) ====================
-    function onBrowseStartdir(src,~)
+    function onBrowseTarget(src,~)
         fig = ancestor(src,'figure');
-        editH = findobj(fig,'tag','startdir');
-        p = uigetdir('','Select ADAM RESULTS root');
+        editH = findobj(fig,'tag','tgt');
+        p = uigetdir('','Select contrast folder or parent folder');
         if isequal(p,0), return; end
         set(editH,'string',p);
-        refreshContrasts(src,[]);
     end
 
-    function refreshContrasts(src,~)
-        fig = ancestor(src,'figure');
-        root = get(findobj(fig,'tag','startdir'),'string');
-        [names2,paths2] = scan_contrasts(root);
-        popH = findobj(fig,'tag','contrast_popup');
-        if isempty(paths2)
-            set(popH,'string','<no contrasts found>','value',1,'userdata',[]);
-        else
-            set(popH,'string',names2,'value',1,'userdata',paths2);
-        end
-    end
-
-    function onPickElectrodes(src,labels)
-        fig = ancestor(src,'figure');
+    function onPickElectrodes(src,~)
+        % Try STUDY first with channel-count consistency check; fallback to EEG.
+        [labels, msg] = study_labels_if_consistent();
         if isempty(labels)
-            warndlg('No EEG.chanlocs in base workspace.','ADAM'); return;
+            if ~isempty(msg), warndlg(msg,'ADAM'); end
+            labels = eeg_base_labels(); % may still be empty -> warn below
         end
+        if isempty(labels)
+            warndlg('No electrode labels available (no STUDY/EEG with chanlocs).','ADAM');
+            return;
+        end
+
+        fig = ancestor(src,'figure');
         [idxL,ok] = listdlg('PromptString','Select electrodes', ...
                             'SelectionMode','multiple', ...
-                            'ListString',labels,'ListSize',[220 300]);
+                            'ListString',labels,'ListSize',[240 320]);
         if ~ok, return; end
         set(findobj(fig,'tag','elec'),'string', strjoin(labels(idxL), ','));
     end
 
 % ==================== Utilities ====================
     function addc(c), uilist{end+1} = c; end %#ok<AGROW>
+
     function k = pickIndex(opts,val,defIdx)
         k = find(strcmpi(opts,val),1); if isempty(k), k = defIdx; end
     end
+
     function v = pick(opts,i,defv)
         if isempty(i) || i<1 || i>numel(opts), v = defv; else, v = opts{i}; end
     end
+
     function C = parse_electrodes(s)
         if isstring(s), s = char(s); end
         s = strrep(strrep(s,',',' '),';',' ');
@@ -181,6 +175,7 @@ adam_plot_MVPA(cfgp, erp_stats, erp_stats_dif);
         C = parts(~cellfun(@isempty,parts));
         if isempty(C), C = {'P10'}; end
     end
+
     function L = eval_linecolors(s)
         toks = regexp(s,'\[(.*?)\]','tokens');
         if isempty(toks), error('bad colors'); end
@@ -188,25 +183,43 @@ adam_plot_MVPA(cfgp, erp_stats, erp_stats_dif);
         ok = cellfun(@(x) isnumeric(x) && numel(x)==3, L);
         if ~all(ok), error('bad colors'); end
     end
-    function [names,paths] = scan_contrasts(root)
-        names = {}; paths = {};
+
+    function tf = is_contrast_folder(p)
+        if isempty(p) || ~exist(p,'dir'), tf = false; return; end
+        [~,name] = fileparts(p);
+        tf = contains(name,'_VS_','IgnoreCase',true);
+    end
+
+    function startd = startdir_for(selectedFolder)
+        if is_contrast_folder(selectedFolder)
+            startd = fileparts(selectedFolder);
+            if isempty(startd), startd = selectedFolder; end
+        else
+            startd = selectedFolder;
+        end
+    end
+
+    function list = find_contrast_subfolders(root, recursiveFlag)
+        list = {};
         if isempty(root) || ~exist(root,'dir'), return; end
-        dd = genpath(root);
-        allp = regexp(dd, pathsep, 'split');
-        allp = allp(~cellfun(@isempty,allp));
-        for i=1:numel(allp)
-            p = allp{i};
-            [~,base] = fileparts(p);
-            if contains(base,'_VS_','IgnoreCase',true)
-                names{end+1} = base; %#ok<AGROW>
-                paths{end+1} = p;    %#ok<AGROW>
+        if ~recursiveFlag
+            d = dir(root); d = d([d.isdir]);
+            names = {d.name};
+            names = names(~ismember(lower(names),{'.','..'}));
+            for i = 1:numel(names)
+                sub = fullfile(root, names{i});
+                if is_contrast_folder(sub), list{end+1} = sub; end %#ok<AGROW>
             end
+        else
+            dd = genpath(root);
+            allp = regexp(dd, pathsep, 'split'); allp = allp(~cellfun(@isempty,allp));
+            for i=1:numel(allp), if is_contrast_folder(allp{i}), list{end+1} = allp{i}; end, end
+            list = unique(list,'stable');
         end
-        % unique stable
-        [~,ia] = unique(paths,'stable'); names = names(ia); paths = paths(ia);
-        if isempty(names)
-            names = {'<no contrasts found>'}; paths = {};
-        end
+    end
+
+    function n = contrast_name(p)
+        [~,n] = fileparts(p);
     end
 
     function v = nextstr(cellres)
@@ -214,8 +227,73 @@ adam_plot_MVPA(cfgp, erp_stats, erp_stats_dif);
         if isstring(v), v = char(v); end
         if ~ischar(v), v = ''; end
     end
+
     function n = nextnum(cellres)
         idx = idx + 1; n = cellres{idx};
         if isempty(n) || ~isscalar(n), n = NaN; end
+    end
+
+    % -------- Electrode sources with STUDY consistency check --------
+    function [labels, msg] = study_labels_if_consistent()
+        labels = {}; msg = '';
+        try
+            hasST = evalin('base','exist(''STUDY'',''var'') == 1');
+        catch, hasST = false; end
+        if ~hasST, msg = 'No STUDY in base workspace.'; return; end
+
+        try
+            STUDY = evalin('base','STUDY');
+            ALLEEG = evalin('base','ALLEEG');
+        catch
+            msg = 'Cannot access STUDY/ALLEEG in base workspace.'; return;
+        end
+        if ~isfield(STUDY,'datasetinfo') || isempty(STUDY.datasetinfo)
+            msg = 'STUDY.datasetinfo is empty.'; return;
+        end
+
+        % Gather nbchan for each dataset present in ALLEEG
+        nbchans = [];
+        idxs = [];
+        for k = 1:numel(STUDY.datasetinfo)
+            if isfield(STUDY.datasetinfo(k),'index') && ~isempty(STUDY.datasetinfo(k).index)
+                ai = STUDY.datasetinfo(k).index;
+            else
+                ai = []; % unknown index
+            end
+            if isempty(ai) || ai<1 || ai>numel(ALLEEG) || isempty(ALLEEG(ai).data)
+                continue; % skip unloaded
+            end
+            nbchans(end+1) = ALLEEG(ai).nbchan; %#ok<AGROW>
+            idxs(end+1)    = ai; %#ok<AGROW>
+        end
+
+        
+        if length(unique(nbchans)) > 1
+            msg = sprintf('Inconsistent channel counts across STUDY datasets');
+            labels = {};
+            return;
+        end
+
+        % Same nbchan -> take labels from the first loaded dataset
+        ai1 = idxs(1);
+        if isfield(ALLEEG(ai1),'chanlocs') && ~isempty(ALLEEG(ai1).chanlocs)
+            labels = {ALLEEG(ai1).chanlocs.labels};
+            labels = labels(~cellfun(@isempty,labels));
+        end
+        if isempty(labels)
+            msg = 'First dataset has no chanlocs labels.'; % will trigger fallback
+        end
+    end
+
+    function labels = eeg_base_labels()
+        labels = {};
+        try
+            EEG = evalin('base','EEG');
+            if isstruct(EEG) && isfield(EEG,'chanlocs') && ~isempty(EEG.chanlocs)
+                labels = {EEG.chanlocs.labels};
+                labels = labels(~cellfun(@isempty,labels));
+            end
+        catch
+        end
     end
 end
