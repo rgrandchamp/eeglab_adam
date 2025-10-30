@@ -57,10 +57,10 @@ addc({ 'style' 'edit' 'tag' 'class2_name' 'string' def.classname2 });
 
 % Other controls
 addc({ 'style' 'text' 'string' 'Model' });
-addc({ 'style' 'popupmenu' 'string' 'BDM|FEM' 'value' iff(strcmpi(def.model,'BDM'),1,2) });
+addc({ 'style' 'popupmenu' 'string' 'BDM' 'value' iff(strcmpi(def.model,'BDM'),1,2) });
 
 addc({ 'style' 'text' 'string' 'Data' });
-addc({ 'style' 'popupmenu' 'string' 'raw|tfr' 'value' iff(strcmpi(def.raw_or_tfr,'raw'),1,2) });
+addc({ 'style' 'popupmenu' 'string' 'raw' 'value' iff(strcmpi(def.raw_or_tfr,'raw'),1,2) });
 
 addc({ 'style' 'text' 'string' 'Performance' });
 addc({ 'style' 'popupmenu' 'string' 'AUC|accuracy|dprime' 'value' idxOf({'AUC','accuracy','dprime'}, def.class_method, 1) });
@@ -119,8 +119,8 @@ end
 cfg = struct();
 cfg.class_spec    = { class1, class2 };
 cfg.class_labels  = { fallback_str(class1_name, def.classname1), fallback_str(class2_name, def.classname2) };
-cfg.model         = pick({'BDM','FEM'}, model_i, def.model);
-cfg.raw_or_tfr    = pick({'raw','tfr'}, raw_i, def.raw_or_tfr);
+cfg.model         = pick({'BDM'}, model_i, def.model);
+cfg.raw_or_tfr    = pick({'raw'}, raw_i, def.raw_or_tfr);
 cfg.class_method  = pick({'AUC','accuracy','dprime'}, method_i, def.class_method);
 cfg.crossclass    = pick({'yes','no'}, cross_i, def.crossclass);
 cfg.channelpool   = fallback_str(channelpool_s, def.channelpool);

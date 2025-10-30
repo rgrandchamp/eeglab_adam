@@ -16,7 +16,7 @@ It simplifies the entire decoding workflow — from defining contrasts to visual
 ## Main Features
 
 ### 1. **First-Level MVPA Analysis**
-- GUI for defining class specifications (`cond_string`), model type (`BDM` or `FEM`), classification method, resampling rate, etc.
+- GUI for defining class specifications (`cond_string`), model type (`BDM` only), classification method, resampling rate, etc.
 - Custom **output folder** support (`cfg.outputdir`).
 - Automatically creates a subfolder for each contrast in the format:  
   `RESULTS/CLASS1LABEL_VS_CLASS2LABEL`
@@ -115,7 +115,7 @@ adam_plot_MVPA([], mvpa_stats);
 
 ---
 
-## 🆕 What’s New in v0.4.0
+## 🆕 What’s New in v0.1
 
 - ✅ Added configurable **output directory** for first-level analyses  
 - ✅ **Group ERP Viewer** with automatic difference computation  
