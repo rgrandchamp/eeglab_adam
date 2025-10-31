@@ -1,6 +1,6 @@
 # EEGLAB–ADAM Plugin
 
-> **Version 0.1** – October 2025  
+> **Version 0.1.1** – October 2025  
 > An EEGLAB plugin to run the [ADAM toolbox](https://github.com/fahrenfort/ADAM) (Amsterdam Decoding and Modeling Toolbox) directly from an EEGLAB STUDY.
 
 ---
@@ -115,7 +115,7 @@ adam_plot_MVPA([], mvpa_stats);
 
 ---
 
-## 🆕 What’s New in v0.2
+## 🆕 What’s New in v0.1.1
 - ✅ Added BDM activation patterns plot  
 
 
