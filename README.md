@@ -125,6 +125,31 @@ adam_plot_MVPA([], mvpa_stats);
 
 ---
 
+## 🛠️ Current Limitations
+
+- Requires manually specifying FieldTrip version ≤ 2022-12-23.  
+- Class definition only supports event types as integers.  
+- GUI windows may appear wider than necessary on small screens.
+- No decoding based on TFR (time-frequency decomposition).
+- No FEM (Forward Encoding Models) support.
+- Cannot Plot activations pattern using BDM.
+
+---
+
+## 🧭 Roadmap
+
+Planned features for upcoming releases:
+
+- **Make GUI more compact** — optimize window geometry and scaling for typical laptop displays.  
+- **Add activations pattern plotting using BDM** — allow call to adam_plot_BDM_weights function.
+- **Add support for TFR (time-frequency decomposition)** — enable MVPA on induced or total power using ADAM’s `raw_or_tfr = 'tfr'` mode.  
+- **Add FEM (Forward Encoding Models)** — allow direct computation of encoding models alongside backward decoding models.  
+- **Allow text-based trigger values** — support non-numeric event codes for class definitions in study designs.  
+- **Ensure compatibility with latest FieldTrip** — remove dependency on a fixed legacy version by adapting function calls dynamically.
+
+---
+
+
 ## Reference
 
 Fahrenfort, J. J., Van Driel, J., Van Gaal, S., & Olivers, C. N. L. (2018).  
