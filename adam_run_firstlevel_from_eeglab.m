@@ -119,9 +119,15 @@ function root = commonroot(paths)
     if isempty(common)
         % If nothing common, use the folder of the first file
         root = fileparts(paths{1});
+        if ~ispc
+            root = [ '/' root ];
+        end
     else
         root = fullfile(common{:});
         % If the common path ends at the file name level, back up one dir
+        if ~ispc
+            root = [ '/' root ];
+        end
         if ~isfolder(root)
             root = fileparts(root);
         end
