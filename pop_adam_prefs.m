@@ -7,6 +7,26 @@ adamRoot   = getpref('eeglab_adam','adamRoot','');
 ftRoot     = getpref('eeglab_adam','ftRoot','');
 eeglabRoot = getpref('eeglab_adam','eeglabRoot','');
 
+% ---- Detect EEGLAB root if pref empty ----
+if isempty(eeglabRoot)
+    try
+        eeglabFile = which('eeglab');
+        if ~isempty(eeglabFile)
+            eeglabRoot = fileparts(eeglabFile);
+        end
+    catch
+    end
+end
+
+% ---- Default FieldTrip path if empty (requested behavior) ----
+% <EEGLAB root>\plugins\eeglab_adam\external\fieldtrip-20170704
+if isempty(ftRoot) && ~isempty(eeglabRoot)
+    ftDefault = fullfile(eeglabRoot, 'plugins', 'eeglab_adam', 'external', 'fieldtrip-20170704');
+    if exist(ftDefault,'dir')
+        ftRoot = ftDefault;  % prefill GUI with this default
+    end
+end
+
 % ---- Geometry ----
 geometry = { ...
     [1] ...            % Title
@@ -59,20 +79,12 @@ setpref('eeglab_adam','adamRoot',adamRoot);
 setpref('eeglab_adam','ftRoot',ftRoot);
 setpref('eeglab_adam','eeglabRoot',eeglabRoot);
 
-% ---- Apply paths immediately (so FieldTrip path is updated now)
+% ---- Apply paths immediately (FieldTrip update done in BASE workspace)
 try
-    % 1) If FT field cleared, remove ANY existing FieldTrip from the path
-    if isempty(ftRoot)
-        ftdefs = which('ft_defaults','-all');
-        for i = 1:numel(ftdefs)
-            try
-                rmpath(genpath(fileparts(ftdefs{i})));
-            catch
-            end
-        end
-    end
+    % 1) Remove ANY existing FieldTrip from path
+    remove_all_fieldtrip_from_path();
 
-    % 2) Re-add ADAM/FT/EEGLAB using your central setup (optional but fine)
+    % 2) Re-add ADAM/FT/EEGLAB using central setup (optional)
     [msgs, info] = adam_setup_paths(struct( ...
         'adamRoot',   adamRoot, ...
         'ftRoot',     ftRoot, ...
@@ -80,25 +92,13 @@ try
     ));
     if ~isempty(msgs), eegh('[ADAM] Path setup: %s', strjoin(msgs,' | ')); end
 
-    % 3) FIELDTRIP SETUP (do it in BASE workspace to avoid static-workspace error)
-    if ~isempty(ftRoot)
-        % a) remove any FT currently on path
-        ftdefs = which('ft_defaults','-all');
-        for i = 1:numel(ftdefs)
-            try
-                rmpath(genpath(fileparts(ftdefs{i})));
-            catch
-            end
-        end
-
-        % b) add the chosen FT root
-        addpath(ftRoot);
-
-        % c) run ft_defaults IN BASE WORKSPACE (escape quotes)
+    % 3) FIELDTRIP SETUP (do it in BASE workspace)
+    if ~isempty(ftRoot) && exist(ftRoot,'dir')
+        % ensure ft root is on base path, then run ft_defaults *in base*
         ftRootEsc = strrep(ftRoot, '''', '''''');
         evalin('base', sprintf('addpath(''%s''); ft_defaults;', ftRootEsc));
 
-        % d) verify (optional but helpful)
+        % verify core functions are available
         ok = ~isempty(which('ft_defaults')) && ~isempty(which('ft_preprocessing'));
         if ok
             eegh('[ADAM] FieldTrip set to: %s', ftRoot);
@@ -107,7 +107,7 @@ try
         end
     end
 
-    % 4) If setup resolved a canonical ADAM root, persist it
+    % 4) Persist canonical ADAM root if resolved
     if isfield(info,'adamRootResolved') && ~isempty(info.adamRootResolved) && ~strcmp(info.adamRootResolved, adamRoot)
         setpref('eeglab_adam','adamRoot',info.adamRootResolved);
         try, set(findobj('tag','adamRoot'),'string',info.adamRootResolved); end
@@ -116,7 +116,6 @@ try
 catch ME
     warndlg(sprintf('Path update failed:\n%s', ME.message), 'ADAM preferences');
 end
-
 
 % Close the preferences window if it's still around
 h = findobj('type','figure','-and','name','ADAM Preferences');
@@ -129,8 +128,6 @@ end
 % Local functions (file-local)
 % =========================
 function addc(cellrow)
-% Append one control row safely into caller's uilist
-% (We rely on evalin to access the parent workspace variable 'uilist')
 uilist = evalin('caller','uilist');
 uilist{end+1} = cellrow; %#ok<AGROW>
 assignin('caller','uilist',uilist);
@@ -152,7 +149,6 @@ set(findobj(gcbf,'tag','eeglabRoot'),'string',p);
 end
 
 function p = uigetdir_smart(editTag, titleStr)
-% Open at current field path if valid, otherwise at pwd
 fig = gcbf;
 cur = '';
 if ~isempty(fig) && ishghandle(fig)
@@ -172,4 +168,12 @@ end
 
 function v = getfield_def(st, fld, def)
 if isstruct(st) && isfield(st,fld), v = st.(fld); else, v = def; end
+end
+
+function remove_all_fieldtrip_from_path()
+ftdefs = which('ft_defaults','-all');
+for i = 1:numel(ftdefs)
+    root = fileparts(ftdefs{i});
+    try, rmpath(genpath(root)); catch, end
+end
 end
