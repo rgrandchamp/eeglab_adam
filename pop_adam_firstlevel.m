@@ -35,7 +35,6 @@ geometry = { ...
     [1 1] ...          % resample
     [1 1] ...          % baseline
     [1 2 0.6] ...      % Output folder + edit + Browse
-    % [1 1 1] ...        % buttons (Preset, Builder, Run)
     };
 
 % ---- Build UI ----
@@ -58,10 +57,10 @@ addc({ 'style' 'edit' 'tag' 'class2_name' 'string' def.classname2 });
 
 % Other controls
 addc({ 'style' 'text' 'string' 'Model' });
-addc({ 'style' 'popupmenu' 'string' 'BDM|FEM' 'value' iff(strcmpi(def.model,'BDM'),1,2) });
+addc({ 'style' 'popupmenu' 'string' 'BDM' 'value' iff(strcmpi(def.model,'BDM'),1,2) });
 
 addc({ 'style' 'text' 'string' 'Data' });
-addc({ 'style' 'popupmenu' 'string' 'raw|tfr' 'value' iff(strcmpi(def.raw_or_tfr,'raw'),1,2) });
+addc({ 'style' 'popupmenu' 'string' 'raw' 'value' iff(strcmpi(def.raw_or_tfr,'raw'),1,2) });
 
 addc({ 'style' 'text' 'string' 'Performance' });
 addc({ 'style' 'popupmenu' 'string' 'AUC|accuracy|dprime' 'value' idxOf({'AUC','accuracy','dprime'}, def.class_method, 1) });
@@ -88,18 +87,6 @@ addc({ 'style' 'pushbutton' 'string' 'Browse...' 'callback' ...
     ['p = uigetdir(''Select output folder''); ' ...
      'if isequal(p,0), return; end; ' ...
      'set(findobj(gcbf,''tag'',''outputdir''),''string'',p);'] });
-
-% % Buttons
-% addc({ 'style' 'pushbutton' 'string' 'Preset WH2015' 'callback' ...
-%     ['set(findobj(gcbf,''tag'',''class1''),''string'',''cond_string([13 14 15],[5 13 17])'');' ...
-%      'set(findobj(gcbf,''tag'',''class1_name''),''string'',''NonFamous_First'');' ...
-%      'set(findobj(gcbf,''tag'',''class2''),''string'',''cond_string([17 18 19],[5 13 17])'');' ...
-%      'set(findobj(gcbf,''tag'',''class2_name''),''string'',''Scrambled_First'');'] });
-% addc({ 'style' 'pushbutton' 'string' 'Class builder...' 'callback' ...
-%     ['[ok,cs1,cs2]=pop_adam_classbuilder();' ...
-%      'if ok, set(findobj(gcbf,''tag'',''class1''),''string'',cs1);' ...
-%      '        set(findobj(gcbf,''tag'',''class2''),''string'',cs2); end'] });
-% addc({ 'style' 'pushbutton' 'string' 'Run' 'callback' 'uiresume(gcbf);' });
 
 % ---- Open GUI ----
 res = inputgui('geometry', geometry, 'uilist', uilist, 'title', 'ADAM First-level (MVPA)');
@@ -132,8 +119,8 @@ end
 cfg = struct();
 cfg.class_spec    = { class1, class2 };
 cfg.class_labels  = { fallback_str(class1_name, def.classname1), fallback_str(class2_name, def.classname2) };
-cfg.model         = pick({'BDM','FEM'}, model_i, def.model);
-cfg.raw_or_tfr    = pick({'raw','tfr'}, raw_i, def.raw_or_tfr);
+cfg.model         = pick({'BDM'}, model_i, def.model);
+cfg.raw_or_tfr    = pick({'raw'}, raw_i, def.raw_or_tfr);
 cfg.class_method  = pick({'AUC','accuracy','dprime'}, method_i, def.class_method);
 cfg.crossclass    = pick({'yes','no'}, cross_i, def.crossclass);
 cfg.channelpool   = fallback_str(channelpool_s, def.channelpool);

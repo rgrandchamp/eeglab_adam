@@ -97,9 +97,9 @@ end
 
 % ==================== Callbacks (nested) ====================
     function onBrowseTarget(src,~)
-        fig = ancestor(src,'figure');
+        fig   = ancestor(src,'figure');
         editH = findobj(fig,'tag','tgt');
-        p = uigetdir('','Select contrast folder or parent folder');
+        p = uigetdir_smart(fig, 'tgt', 'Select contrast folder or parent folder');
         if isequal(p,0), return; end
         set(editH,'string',p);
     end
@@ -150,4 +150,18 @@ end
         if isstring(v), v = char(v); end
         if ~ischar(v), v = ''; end
     end
+end
+function p = uigetdir_smart(figHandle, editTag, titleStr)
+% UIGETDIR_SMART - Open a folder picker starting at the current value of an edit field.
+% If that path is invalid/empty, fall back to the current working directory (pwd).
+
+cur = '';
+h = findobj(figHandle,'tag',editTag);
+if ~isempty(h)
+    cur = strtrim(get(h,'string'));
+end
+if isempty(cur) || ~exist(cur,'dir')
+    cur = pwd;
+end
+p = uigetdir(cur, titleStr);
 end

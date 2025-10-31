@@ -1,33 +1,36 @@
-function pop_adam_diag_mvpa_viewer()
-% POP_ADAM_DIAG_MVPA_VIEWER - Compute & plot diagonal decoding (group MVPA) for one or many contrasts.
+function pop_adam_bdm_weights_viewer()
+% POP_ADAM_BDM_WEIGHTS_VIEWER - Compute (diag) and plot BDM activation patterns for one or many contrasts.
 %
-% Adds:
-%   - "Pick…" button next to plot_order. It scans the Target folder and lets the user
-%     select contrast folders. The selected names populate the plot_order field.
+% Mirrors the OK/Cancel handling style of pop_adam_tgm_viewer.m (plain inputgui).
+% Steps:
+%   1) Select Target folder (a single "*_VS_*" contrast folder or a parent folder with many contrasts).
+%   2) Optionally "Pick…" contrasts to fill cfg.plot_order.
+%   3) Compute diagonal MVPA (reduce_dims='diag'), then plot patterns with adam_plot_BDM_weights.
 %
 % Author: <Your Name>, 2025 | License: GPLv3
 
 % ---------- Defaults ----------
-def.target_folder     = getpref('eeglab_adam','resultsRoot',''); % remember last used
-def.mpcompcor_method  = 'cluster_based';
-def.reduce_dims       = 'diag';   % forced
-def.singleplot        = true;
-def.acclim_txt        = '[0.4 0.8]'; % example; leave empty to use ADAM defaults
-def.plot_order_txt    = '';
-def.scan_recursive    = false;    % scan immediate subfolders
+def.target_folder          = getpref('eeglab_adam','resultsRoot','');
+def.mpcompcor_method       = 'cluster_based';
+def.plot_order_txt         = '';
+def.pattern_opt            = 'covpatterns';   % 'covpatterns' | 'weights'
+def.weightlim_txt          = '[-1.2 1.2]';    % leave empty for ADAM default
+def.timelim_txt            = '[250 400]';     % leave empty for ADAM default
+def.scan_recursive         = false;
 
-% ---------- Geometry ----------
+% ---------- GUI layout (like pop_adam_tgm_viewer) ----------
 geometry = { ...
     [1] ...                 % Title
     [1 2 0.8] ...           % Target folder + edit + Browse
     [1 2] ...               % MCC method
-    [1 2] ...               % Singleplot
-    [1 2] ...               % acclim
+    [1 2] ...               % Pattern type
+    [1 2] ...               % weightlim
+    [1 2] ...               % timelim
     [1 2 0.8] ...           % plot_order + edit + Pick...
     };
 
 uilist = {};
-addc({ 'style' 'text' 'string' 'ADAM: Diagonal decoding (single or multi-contrast)' });
+addc({ 'style' 'text' 'string' 'ADAM: BDM activation patterns (covariance patterns / classifier weights)' });
 
 % Target folder
 addc({ 'style' 'text'  'string' 'Target folder (contrast or parent):' });
@@ -38,33 +41,39 @@ addc({ 'style' 'pushbutton' 'string' 'Browse...' , 'callback', @onBrowseTarget }
 mpopts = {'none','cluster_based','bonferroni','fdr'};
 addc({ 'style' 'text' 'string' 'Multiple-comparison correction:' });
 addc({ 'style' 'popupmenu' 'tag' 'mp' 'string' strjoin(mpopts,'|') ...
-    'value' pickIndex(mpopts, def.mpcompcor_method, 2) });
+      'value' pickIndex(mpopts, def.mpcompcor_method, 2) });
 
-% Singleplot
-addc({ 'style' 'text' 'string' 'Single figure (singleplot):' });
-addc({ 'style' 'checkbox' 'tag' 'single' 'value' double(def.singleplot) });
+% Pattern type
+ptopts = {'covpatterns','weights'};
+addc({ 'style' 'text' 'string' 'Pattern type:' });
+addc({ 'style' 'popupmenu' 'tag' 'pt' 'string' strjoin(ptopts,'|') ...
+      'value' pickIndex(ptopts, def.pattern_opt, 1) });
 
-% acclim
-addc({ 'style' 'text' 'string' 'acclim (e.g., [0.4 0.8], empty = default):' });
-addc({ 'style' 'edit' 'tag' 'acclim' 'string' def.acclim_txt });
+% weightlim
+addc({ 'style' 'text' 'string' 'Weight limits (e.g., [-1.2 1.2]):' });
+addc({ 'style' 'edit' 'tag' 'wlim' 'string' def.weightlim_txt });
+
+% timelim
+addc({ 'style' 'text' 'string' 'Time window (ms, e.g., [250 400]):' });
+addc({ 'style' 'edit' 'tag' 'tlim' 'string' def.timelim_txt });
 
 % plot_order + Pick
 addc({ 'style' 'text' 'string' 'plot_order (contrast names):' });
 addc({ 'style' 'edit' 'tag' 'plotord' 'string' def.plot_order_txt });
-addc({ 'style' 'pushbutton' 'string' 'Pick…' , 'callback', @onPickContrasts });
+addc({ 'style' 'pushbutton' 'string' 'Pick...' , 'callback', @onPickContrasts });
 
-
-% ---------- Open dialog ----------
+% ---------- Open dialog (plain inputgui like TGM viewer) ----------
 res = inputgui('geometry', geometry, 'uilist', uilist, ...
-    'title', 'ADAM Diagonal decoding Viewer (single or multi-contrast)');
+               'title', 'ADAM BDM Activation Patterns');
 if isempty(res), return; end
 
-% ---------- Map outputs ----------
+% ---------- Map outputs (same style as TGM viewer) ----------
 idx = 0;
 target_folder = nextstr(res);
 mp_i          = nextnum(res);
-single_val    = nextnum(res);
-acclim_txt    = nextstr(res);
+pt_i          = nextnum(res);
+wlim_txt      = nextstr(res);
+tlim_txt      = nextstr(res);
 plotord_txt   = nextstr(res);
 
 % ---------- Validate target ----------
@@ -74,7 +83,7 @@ if isempty(target_folder) || ~exist(target_folder,'dir')
 end
 setpref('eeglab_adam','resultsRoot', target_folder);
 
-% Build contrasts list to compute
+% Build contrast list to compute
 if is_contrast_folder(target_folder)
     contrast_paths = {target_folder};
 else
@@ -84,47 +93,47 @@ else
     end
 end
 
-% ---------- Build base cfg ----------
+% ---------- Build cfg for compute (diag) ----------
 cfg_base = [];
 cfg_base.startdir         = startdir_for(target_folder);
 cfg_base.mpcompcor_method = pick(mpopts, mp_i, def.mpcompcor_method);
-cfg_base.reduce_dims      = def.reduce_dims; % 'diag'
+cfg_base.reduce_dims      = 'diag';  % train==test time
 
 % ---------- Compute ----------
-mvpa_stats = cell(1, numel(contrast_paths));
+mvpa_stats     = cell(1, numel(contrast_paths));
 contrast_names = cell(1, numel(contrast_paths));
 for k = 1:numel(contrast_paths)
-    cdir = contrast_paths{k};
+    cdir  = contrast_paths{k};
     cname = contrast_name(cdir);
     contrast_names{k} = cname;
-    eegh_try('[ADAM] Diagonal decoding: %s', cdir);
+    eegh_try('[ADAM] BDM patterns (compute diag): %s', cdir);
     mvpa_stats{k} = adam_compute_group_MVPA(cfg_base, cdir);
 end
 
 % ---------- Plot ----------
 cfgp = [];
-cfgp.singleplot = logical(single_val);
+cfgp.mpcompcor_method       = cfg_base.mpcompcor_method;
+cfgp.plotweights_or_pattern = pick(ptopts, pt_i, def.pattern_opt);
 
-% acclim (optional)
-acclim_txt = strtrim(acclim_txt);
-if ~isempty(acclim_txt)
-    v = try_eval_vec(acclim_txt);
-    if isnumeric(v) && numel(v)==2 && all(isfinite(v))
-        cfgp.acclim = v(:)';
-    else
-        warndlg('Ignoring invalid acclim; expected [lo hi].','ADAM');
-    end
+% weightlim
+wlim = try_eval_vec(wlim_txt);
+if isnumeric(wlim) && numel(wlim)==2 && all(isfinite(wlim))
+    cfgp.weightlim = wlim(:)';
 end
 
-% plot_order (optional)
+% timelim
+tlim = try_eval_vec(tlim_txt);
+if isnumeric(tlim) && numel(tlim)==2 && all(isfinite(tlim))
+    cfgp.timelim = tlim(:)';
+end
+
+% plot_order
 ord = parse_plotorder(plotord_txt);
-if ~isempty(ord)
-    cfgp.plot_order = ord;
-end
+if ~isempty(ord), cfgp.plot_order = ord; end
 
-adam_plot_MVPA(cfgp, mvpa_stats{:});
+adam_plot_BDM_weights(cfgp, mvpa_stats{:});
 if numel(contrast_paths)==1
-    try, set(gcf, 'Name', sprintf('ADAM Diagonal Decoding - %s', contrast_names{1}), 'NumberTitle', 'off'); end
+    try, set(gcf,'Name',sprintf('ADAM BDM Activation Patterns - %s', contrast_names{1}), 'NumberTitle','off'); end
 end
 
 % ==================== Callbacks ====================
@@ -148,7 +157,7 @@ end
             warndlg('No contrast folders (*_VS_*) found under Target.','ADAM'); return;
         end
         [idxL,ok] = listdlg('PromptString','Select contrasts to plot (order preserved):', ...
-            'SelectionMode','multiple', 'ListString',names, 'ListSize',[280 360]);
+                            'SelectionMode','multiple', 'ListString',names, 'ListSize',[280 360]);
         if ~ok, return; end
         set(findobj(fig,'tag','plotord'), 'string', strjoin(names(idxL), ', '));
     end
@@ -162,12 +171,13 @@ end
     function v = try_eval_vec(txt), try, v=eval(txt); catch, v=[]; end, end
 end
 
-% ===== Shared helpers (copy below this file or put in a shared utils file) =====
+% ===== Shared helpers (same as in pop_adam_tgm_viewer) =====
 function tf = is_contrast_folder(p)
 if isempty(p) || ~exist(p,'dir'), tf=false; return; end
 [~,name] = fileparts(p);
 tf = contains(name,'_VS_','IgnoreCase',true);
 end
+
 function startd = startdir_for(selectedFolder)
 if is_contrast_folder(selectedFolder)
     startd = fileparts(selectedFolder); if isempty(startd), startd = selectedFolder; end
@@ -175,6 +185,7 @@ else
     startd = selectedFolder;
 end
 end
+
 function list = find_contrast_subfolders(root, recursiveFlag)
 list = {};
 if isempty(root) || ~exist(root,'dir'), return; end
@@ -192,6 +203,7 @@ else
     list = unique(list,'stable');
 end
 end
+
 function [names,paths] = build_contrast_name_list(root, recursiveFlag)
 if is_contrast_folder(root)
     names = {contrast_name(root)}; paths = {root}; return;
@@ -199,10 +211,9 @@ end
 paths = find_contrast_subfolders(root, recursiveFlag);
 names = cellfun(@contrast_name, paths, 'UniformOutput', false);
 end
+
 function n = contrast_name(p), [~,n] = fileparts(p); end
-function eegh_try(fmt, varargin)
-try, eegh(fmt, varargin{:}); catch, end
-end
+
 function ord = parse_plotorder(s)
 ord = {};
 if isstring(s), s = char(s); end
@@ -212,17 +223,15 @@ s = strrep(strrep(s,',',' '),';',' ');
 parts = regexp(s, '\s+', 'split');
 ord = parts(~cellfun(@isempty,parts));
 end
-function p = uigetdir_smart(figHandle, editTag, titleStr)
-% UIGETDIR_SMART - Open a folder picker starting at the current value of an edit field.
-% If that path is invalid/empty, fall back to the current working directory (pwd).
 
+function p = uigetdir_smart(figHandle, editTag, titleStr)
 cur = '';
 h = findobj(figHandle,'tag',editTag);
-if ~isempty(h)
-    cur = strtrim(get(h,'string'));
-end
-if isempty(cur) || ~exist(cur,'dir')
-    cur = pwd;
-end
+if ~isempty(h), cur = strtrim(get(h,'string')); end
+if isempty(cur) || ~exist(cur,'dir'), cur = pwd; end
 p = uigetdir(cur, titleStr);
+end
+
+function eegh_try(fmt, varargin)
+try, eegh(fmt, varargin{:}); catch, end
 end

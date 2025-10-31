@@ -7,3 +7,6 @@ derivative
 !/plugins/firfilt
 !/plugins/ICLabel
 .DS_Store
+external/ADAM
+external/fieldtrip-20170704/.gitignore
+external/fieldtrip-20170704/.travis.yml
