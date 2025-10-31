@@ -115,13 +115,9 @@ adam_plot_MVPA([], mvpa_stats);
 
 ---
 
-## 🆕 What’s New in v0.1
+## 🆕 What’s New in v0.2
+- ✅ Added BDM activation patterns plot  
 
-- ✅ Added configurable **output directory** for first-level analyses  
-- ✅ **Group ERP Viewer** with automatic difference computation  
-- ✅ **Diagonal Decoding Viewer** (multi-contrast capable)  
-- ✅ **Single-Subject Decoding Viewer**  
-- ✅ **Temporal Generalization Viewer** with **custom training time window (ms)** and `reduce_dims` options
 
 ---
 
@@ -132,7 +128,6 @@ adam_plot_MVPA([], mvpa_stats);
 - GUI windows may appear wider than necessary on small screens.
 - No decoding based on TFR (time-frequency decomposition).
 - No FEM (Forward Encoding Models) support.
-- Cannot Plot activations pattern using BDM.
 
 ---
 
@@ -141,7 +136,6 @@ adam_plot_MVPA([], mvpa_stats);
 Planned features for upcoming releases:
 
 - **Make GUI more compact** — optimize window geometry and scaling for typical laptop displays.  
-- **Add activations pattern plotting using BDM** — allow call to adam_plot_BDM_weights function.
 - **Add support for TFR (time-frequency decomposition)** — enable MVPA on induced or total power using ADAM’s `raw_or_tfr = 'tfr'` mode.  
 - **Add FEM (Forward Encoding Models)** — allow direct computation of encoding models alongside backward decoding models.  
 - **Allow text-based trigger values** — support non-numeric event codes for class definitions in study designs.  
